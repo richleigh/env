@@ -1,10 +1,12 @@
-package env
+package env // github.com/richleigh/env
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // ErrNotAStructPtr is returned if you pass something that is not a pointer to a
@@ -31,7 +33,10 @@ func Parse(val interface{}) error {
 func doParse(ref reflect.Value, val interface{}) error {
 	refType := ref.Type()
 	for i := 0; i < refType.NumField(); i++ {
-		value := get(refType.Field(i))
+		value, err := get(refType.Field(i))
+		if err != nil {
+			return err
+		}
 		if value == "" {
 			continue
 		}
@@ -42,17 +47,33 @@ func doParse(ref reflect.Value, val interface{}) error {
 	return nil
 }
 
-func get(field reflect.StructField) string {
-	defaultValue := field.Tag.Get("envDefault")
-	return getOr(field.Tag.Get("env"), defaultValue)
-}
-
-func getOr(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value != "" {
-		return value
+func get(field reflect.StructField) (string, error) {
+	name := field.Tag.Get("env")
+	// If there's no tag, then there's no expected envirionment variable
+	if name == "" {
+		return "", nil
 	}
-	return defaultValue
+	
+	// Check to see if we have the "optional" modifier
+	bits := strings.Split(name, ",")
+	if len(bits) >= 3 {
+		return "", errors.New(fmt.Sprintf("Couldn't parse struct tag '%s'; too many ','s (expected at most 1, got %d)", name, len(bits)))
+	}
+	name = bits[0]
+	optional := false
+	if len(bits) == 2 {
+		if bits[1] != "optional" {
+			return "", errors.New(fmt.Sprintf("Couldn't parse struct tag '%s'; expected 'optional' after ',', got '%s'", name, bits[1]))
+		}
+		optional = true
+	}
+	
+	// Now look in the environment
+	value := os.Getenv(name)
+	if optional || value != "" {
+		return value, nil
+	}
+	return "", errors.New(fmt.Sprintf("Missing config environment variable '%s'", name))
 }
 
 func set(field reflect.Value, value string) error {

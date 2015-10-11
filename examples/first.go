@@ -2,18 +2,24 @@ package main
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/caarlos0/env"
+	"github.com/richleigh/env"
 )
 
 type config struct {
 	Home         string `env:"HOME"`
-	Port         int    `env:"PORT" default:"3000"`
-	IsProduction bool   `env:"PRODUCTION"`
+	Port         int    `env:"PORT"`
+	IsProduction bool   `env:"PRODUCTION,optional"`
 }
 
 func main() {
+	os.Setenv("HOME", "/tmp/fakehome")
 	cfg := config{}
-	env.Parse(&cfg)
-	fmt.Println(cfg)
+	err := env.Parse(&cfg)
+	if err == nil {
+		fmt.Println(cfg)
+	} else {
+		fmt.Println(err)
+	}
 }

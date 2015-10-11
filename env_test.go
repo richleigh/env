@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/caarlos0/env"
+	"github.com/richleigh/env"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +14,7 @@ type Config struct {
 	Other       bool   `env:"othervar"`
 	Port        int    `env:"PORT"`
 	NotAnEnv    string
-	DatabaseURL string `env:"DATABASE_URL" envDefault:"postgres://localhost:5432/db"`
+	DatabaseURL string `env:"DATABASE_URL,optional"`
 }
 
 func TestParsesEnv(t *testing.T) {
@@ -34,10 +34,7 @@ func TestParsesEnv(t *testing.T) {
 
 func TestEmptyVars(t *testing.T) {
 	cfg := Config{}
-	assert.NoError(t, env.Parse(&cfg))
-	assert.Equal(t, "", cfg.Some)
-	assert.Equal(t, false, cfg.Other)
-	assert.Equal(t, 0, cfg.Port)
+	assert.Error(t, env.Parse(&cfg))
 }
 
 func TestPassAnInvalidPtr(t *testing.T) {
@@ -51,6 +48,11 @@ func TestPassReference(t *testing.T) {
 }
 
 func TestInvalidBool(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("PORT", "8080")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("PORT", "")
+
 	os.Setenv("othervar", "should-be-a-bool")
 	defer os.Setenv("othervar", "")
 
@@ -59,6 +61,11 @@ func TestInvalidBool(t *testing.T) {
 }
 
 func TestInvalidInt(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("othervar", "true")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("othervar", "")
+	
 	os.Setenv("PORT", "should-be-an-int")
 	defer os.Setenv("PORT", "")
 
@@ -66,13 +73,42 @@ func TestInvalidInt(t *testing.T) {
 	assert.Error(t, env.Parse(&cfg))
 }
 
-func TestParsesDefaultConfig(t *testing.T) {
+func TestParsesOptionalMissing(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("othervar", "true")
+	os.Setenv("PORT", "8080")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("othervar", "")
+	defer os.Setenv("PORT", "")
+
 	cfg := Config{}
 	assert.NoError(t, env.Parse(&cfg))
-	assert.Equal(t, "postgres://localhost:5432/db", cfg.DatabaseURL)
+	assert.Equal(t, "", cfg.DatabaseURL)
+}
+
+func TestParsesOptionalPresent(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("othervar", "true")
+	os.Setenv("PORT", "8080")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("othervar", "")
+	defer os.Setenv("PORT", "")
+
+	cfg := Config{}
+	db := "postgres://localhost:5432/db"
+	os.Setenv("DATABASE_URL", db)
+	assert.NoError(t, env.Parse(&cfg))
+	assert.Equal(t, db, cfg.DatabaseURL)
 }
 
 func TestParseStructWithoutEnvTag(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("othervar", "true")
+	os.Setenv("PORT", "8080")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("othervar", "")
+	defer os.Setenv("PORT", "")
+
 	cfg := Config{}
 	assert.NoError(t, env.Parse(&cfg))
 	assert.Empty(t, cfg.NotAnEnv)
@@ -90,12 +126,39 @@ func TestParseStructWithInvalidFieldKind(t *testing.T) {
 func ExampleParse() {
 	type config struct {
 		Home         string `env:"HOME"`
-		Port         int    `env:"PORT" envDefault:"3000"`
-		IsProduction bool   `env:"PRODUCTION"`
+		Port         int    `env:"PORT"`
+		IsProduction bool   `env:"PRODUCTION,optional"`
 	}
 	os.Setenv("HOME", "/tmp/fakehome")
+	os.Setenv("PORT", "3000")
+	defer os.Setenv("HOME", "")
+	defer os.Setenv("PORT", "")
+	
 	cfg := config{}
-	env.Parse(&cfg)
-	fmt.Println(cfg)
+	err := env.Parse(&cfg)
+	if err == nil {
+		fmt.Println(cfg)
+	} else {
+		fmt.Println(err)
+	}
 	// Output: {/tmp/fakehome 3000 false}
+}
+
+func ExampleFail() {
+	type config struct {
+		Home         string `env:"HOME"`
+		Port         int    `env:"PORT"`
+		IsProduction bool   `env:"PRODUCTION,optional"`
+	}
+	os.Setenv("HOME", "/tmp/fakehome")
+	defer os.Setenv("HOME", "")
+	
+	cfg := config{}
+	err := env.Parse(&cfg)
+	if err == nil {
+		fmt.Println(cfg)
+	} else {
+		fmt.Println(err)
+	}
+	// Output: Missing config environment variable 'PORT'
 }
