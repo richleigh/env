@@ -65,7 +65,7 @@ func TestInvalidInt(t *testing.T) {
 	os.Setenv("othervar", "true")
 	defer os.Setenv("somevar", "")
 	defer os.Setenv("othervar", "")
-	
+
 	os.Setenv("PORT", "should-be-an-int")
 	defer os.Setenv("PORT", "")
 
@@ -133,7 +133,7 @@ func ExampleParse() {
 	os.Setenv("PORT", "3000")
 	defer os.Setenv("HOME", "")
 	defer os.Setenv("PORT", "")
-	
+
 	cfg := config{}
 	err := env.Parse(&cfg)
 	if err == nil {
@@ -152,7 +152,7 @@ func ExampleFail() {
 	}
 	os.Setenv("HOME", "/tmp/fakehome")
 	defer os.Setenv("HOME", "")
-	
+
 	cfg := config{}
 	err := env.Parse(&cfg)
 	if err == nil {

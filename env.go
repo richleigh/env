@@ -53,27 +53,27 @@ func get(field reflect.StructField) (string, error) {
 	if name == "" {
 		return "", nil
 	}
-	
+
 	// Check to see if we have the "optional" modifier
 	bits := strings.Split(name, ",")
 	if len(bits) >= 3 {
-		return "", errors.New(fmt.Sprintf("Couldn't parse struct tag '%s'; too many ','s (expected at most 1, got %d)", name, len(bits)))
+		return "", fmt.Errorf("Couldn't parse struct tag '%s'; too many ','s (expected at most 1, got %d)", name, len(bits))
 	}
 	name = bits[0]
 	optional := false
 	if len(bits) == 2 {
 		if bits[1] != "optional" {
-			return "", errors.New(fmt.Sprintf("Couldn't parse struct tag '%s'; expected 'optional' after ',', got '%s'", name, bits[1]))
+			return "", fmt.Errorf("Couldn't parse struct tag '%s'; expected 'optional' after ',', got '%s'", name, bits[1])
 		}
 		optional = true
 	}
-	
+
 	// Now look in the environment
 	value := os.Getenv(name)
 	if optional || value != "" {
 		return value, nil
 	}
-	return "", errors.New(fmt.Sprintf("Missing config environment variable '%s'", name))
+	return "", fmt.Errorf("Missing config environment variable '%s'", name)
 }
 
 func set(field reflect.Value, value string) error {
