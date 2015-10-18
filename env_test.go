@@ -15,6 +15,7 @@ type Config struct {
 	Port        int    `env:"PORT"`
 	NotAnEnv    string
 	DatabaseURL string `env:"DATABASE_URL,optional"`
+	Password    string `env:"PASSWORD,optional,sensitive"`
 }
 
 func TestParsesEnv(t *testing.T) {
@@ -99,6 +100,36 @@ func TestParsesOptionalPresent(t *testing.T) {
 	os.Setenv("DATABASE_URL", db)
 	assert.NoError(t, env.Parse(&cfg))
 	assert.Equal(t, db, cfg.DatabaseURL)
+}
+
+func TestParsesSensitive(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("othervar", "true")
+	os.Setenv("PORT", "8080")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("othervar", "")
+	defer os.Setenv("PORT", "")
+
+	cfg := Config{}
+	pw := "MrGoodbytes"
+	os.Setenv("PASSWORD", pw)
+	assert.NoError(t, env.Parse(&cfg))
+	assert.Equal(t, pw, cfg.Password)
+	assert.Equal(t, "", os.Getenv("PASSWORD"))
+}
+
+func TestClearSensitiveOnError(t *testing.T) {
+	os.Setenv("somevar", "somevalue")
+	os.Setenv("othervar", "true")
+	defer os.Setenv("somevar", "")
+	defer os.Setenv("othervar", "")
+
+	cfg := Config{}
+	pw := "MrGoodbytes"
+	os.Setenv("PASSWORD", pw)
+	// Should get an error, since we didn't pass in PORT
+	assert.Error(t, env.Parse(&cfg))
+	assert.Equal(t, "", os.Getenv("PASSWORD"))
 }
 
 func TestParseStructWithoutEnvTag(t *testing.T) {

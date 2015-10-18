@@ -32,19 +32,20 @@ func Parse(val interface{}) error {
 
 func doParse(ref reflect.Value, val interface{}) error {
 	refType := ref.Type()
+	var finalErr error
 	for i := 0; i < refType.NumField(); i++ {
 		value, err := get(refType.Field(i))
-		if err != nil {
-			return err
+		if err != nil && finalErr == nil {
+			finalErr = err
 		}
 		if value == "" {
 			continue
 		}
-		if err := set(ref.Field(i), value); err != nil {
-			return err
+		if err := set(ref.Field(i), value); err != nil && finalErr == nil {
+			finalErr = err
 		}
 	}
-	return nil
+	return finalErr
 }
 
 func get(field reflect.StructField) (string, error) {
@@ -54,22 +55,32 @@ func get(field reflect.StructField) (string, error) {
 		return "", nil
 	}
 
-	// Check to see if we have the "optional" modifier
+	// Check to see if we have the "optional" or "sensitive" modifiers
 	bits := strings.Split(name, ",")
-	if len(bits) >= 3 {
-		return "", fmt.Errorf("Couldn't parse struct tag '%s'; too many ','s (expected at most 1, got %d)", name, len(bits))
-	}
 	name = bits[0]
 	optional := false
-	if len(bits) == 2 {
-		if bits[1] != "optional" {
-			return "", fmt.Errorf("Couldn't parse struct tag '%s'; expected 'optional' after ',', got '%s'", name, bits[1])
+	sensitive := false
+	if len(bits) > 1 {
+		for _, bit := range bits[1:] {
+			if bit == "optional" {
+				optional = true
+				continue
+			}
+			if bit == "sensitive" {
+				sensitive = true
+				continue
+			}
+			return "", fmt.Errorf("Couldn't parse struct tag '%s'; expected 'optional' or 'sensitive' after ',', got '%s'", name, bit)
 		}
-		optional = true
 	}
 
 	// Now look in the environment
 	value := os.Getenv(name)
+	if sensitive {
+		if err := os.Unsetenv(name); err != nil {
+			return "", err
+		}
+	}
 	if optional || value != "" {
 		return value, nil
 	}
