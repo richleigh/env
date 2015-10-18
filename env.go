@@ -90,6 +90,7 @@ func get(field reflect.StructField) (string, error) {
 func set(field reflect.Value, value string) error {
 	switch field.Kind() {
 	case reflect.String:
+		value = strings.Replace(strings.Replace(value, "\\n", "\n", -1), "\"", "", -1)
 		field.SetString(value)
 	case reflect.Bool:
 		bvalue, err := strconv.ParseBool(value)
